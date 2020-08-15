@@ -63,11 +63,34 @@ public class ImpFrameAccessor implements FrameAccessor {
 
         @Override
         public FrameAccessor getFrameAccessor(StreamServiceClient streamServiceClient, String stream) {
+            StreamServiceClient[] streamServiceClients ={streamServiceClient};
+            try {
+                StreamInfo[] streammInfos = streamServiceClient.listStreams();
+                for (StreamInfo streammInfo : streammInfos) {
+                    if(streammInfo.getName().equals(stream)){
+                        return new ImpFrameAccessor(streamServiceClients, streamInfo);
+                    }
+
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
             return null;
         }
 
         @Override
         public FrameAccessor getFrameAccessor(StreamServiceClient[] streamServiceClients, String stream) {
+            try {
+                StreamInfo[] streammInfos = streamServiceClients[0].listStreams();
+                for (StreamInfo streammInfo : streammInfos) {
+                    if(streammInfo.getName().equals(stream)){
+                        return new ImpFrameAccessor(streamServiceClients, streamInfo);
+                    }
+
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
             return null;
         }
     }
