@@ -7,41 +7,81 @@ import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.concurrent.*;
 
 public class MyFrameAccessor implements FrameAccessor {
     private StreamServiceClient[] clients;
     private StreamInfo currentStream;
-    private PerformanceStatistics performanceStatistics;
+    private ImpPerformanceStatics performanceStatistics;
+    private HashMap<String, ServiceRecorder> performance = new HashMap<>();
+    private ExecutorService executorService;
+    private int framesCount;
+    private long startTime;
+    private long endTime;
 
 
 
     public MyFrameAccessor(StreamServiceClient[] clients, StreamInfo stream){
         this.clients = clients;
         this.currentStream = stream;
-
-
+        for(StreamServiceClient client:clients){
+            performance.put(client.getHost(),new ServiceRecorder());
+        }
+        performanceStatistics = new ImpPerformanceStatics(performance);
+        executorService = Executors.newFixedThreadPool(clients.length);
+        startTime = System.currentTimeMillis();
     }
+    public int getFramesCount(){
+        return framesCount;
+    }
+
     public StreamInfo getStreamInfo(){
         return currentStream;
     }
 
     public Frame getFrame(int frameID) throws SocketTimeoutException {
-        Frame frame = new ImpFrame(frameID);
+        ImpFrame frame = new ImpFrame(frameID);
         int blockWidth = this.currentStream.getWidthInBlocks();
         int blockHeight = this.currentStream.getHeightInBlocks();
         for (int i = 0; i < blockWidth; i++) {
             for (int j = 0; j < blockHeight; j++) {
-                //Todo
+
+                // Arguments for the constructor of GetBlock
+                // ServiceRecorder serviceRecorder, StreamServiceClient client, String streamName, int frameID, int blockX, int blockY
+
+                int clientIndex = j%clients.length;
+                ServiceRecorder  serviceRecorder = this.performance.get(clients[clientIndex].getHost());
+                StreamServiceClient client = clients[clientIndex];
+
+                GetBlock task = new GetBlock(serviceRecorder, client, this.currentStream.getName(), frameID, i,j);
+                try{
+                    Future<Block> block = executorService.submit(task);
+                    if(block.get()!=null){
+                        frame.setBlock(i,j,block.get());
+                    }
+                }catch (Exception e){
+                    e.printStackTrace();
+                }
             }
 
         }
+        this.framesCount++;
+        return frame;
+    }
+    public void closeAccessor(){
+        executorService.shutdown();
+
+        endTime = System.currentTimeMillis();
+
+        long runningTime = endTime-startTime;
+        performanceStatistics.update(runningTime,framesCount);
 
 
-
-        return null;
     }
 
-    public class GetBlockRunnable implements Runnable{
+
+
+    public static class GetBlock implements Callable<Block> {
         private ServiceRecorder serviceRecorder;
         private StreamServiceClient client;
         private String streamName;
@@ -49,7 +89,7 @@ public class MyFrameAccessor implements FrameAccessor {
         private int blockX;
         private int blockY;
 
-        public GetBlockRunnable(ServiceRecorder serviceRecorder, StreamServiceClient client, String streamName, int frameID, int blockX, int blockY){
+        public GetBlock(ServiceRecorder serviceRecorder, StreamServiceClient client, String streamName, int frameID, int blockX, int blockY){
             this.serviceRecorder = serviceRecorder;
             this.client = client;
             this.streamName = streamName;
@@ -58,20 +98,22 @@ public class MyFrameAccessor implements FrameAccessor {
             this.blockY = blockY;
 
         }
-
-        public void run() {
+        @Override
+        public Block call() throws Exception {
             try {
                 serviceRecorder.incBlockCount();
                 long t1 = System.currentTimeMillis();
-                client.getBlock(streamName,frameID,blockX,blockY);
+                Block block = client.getBlock(streamName,frameID,blockX,blockY);
                 long t2 = System.currentTimeMillis();
                 int latency = (int) (t2-t1);
                 serviceRecorder.addLatency(latency);
+                return block;
             } catch (SocketTimeoutException e) {
                 serviceRecorder.incDropCount();
             }catch (IOException e){
                 e.printStackTrace();
             }
+            return null;
 
         }
     }
@@ -81,7 +123,7 @@ public class MyFrameAccessor implements FrameAccessor {
         return this.performanceStatistics;
     }
 
-    public class ImpFrame implements Frame{
+    public static class ImpFrame implements Frame{
         private Block[][] block;
         private int frameID;
 
@@ -97,9 +139,14 @@ public class MyFrameAccessor implements FrameAccessor {
             this.frameID = frameID;
             this.block = block;
         }
-        public Block getBlock(int blockX, int blockY) throws SocketTimeoutException {
+        public Block getBlock(int blockX, int blockY){
             return this.block[blockX][blockY];
         }
+
+        public void setBlock(int x, int y, Block block) {
+            this.block[x][y] = block;
+        }
+
         public int getFrameID(){
             return frameID;
         }
@@ -186,8 +233,11 @@ public class MyFrameAccessor implements FrameAccessor {
         private long runningTime;
         private int framesNum;
 
-        public ImpPerformanceStatics(HashMap<String, ServiceRecorder> performance, long runningTime, int framesNum){
+        public ImpPerformanceStatics(HashMap<String, ServiceRecorder> performance){
             this.performance = performance;
+        }
+
+        public void update(long runningTime, int framesNum){
             this.runningTime = runningTime;
             this.framesNum = framesNum;
         }
