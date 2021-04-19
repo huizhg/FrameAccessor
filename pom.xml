@@ -7,10 +7,22 @@
     <groupId>com.hui</groupId>
     <artifactId>5dv186a1_mrc19hzg</artifactId>
     <version>1.0-SNAPSHOT</version>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>8</source>
+                    <target>8</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
     <repositories>
         <repository>
             <id>5dv186</id>
-            <url>https://people.cs.umu.se/~axelj/5dv186a1</url>
+            <url>https://people.cs.umu.se/~umu-39/5dv186a1</url>
         </repository>
     </repositories>
 
@@ -19,7 +31,7 @@
         <dependency>
             <groupId>se.umu.cs</groupId>
             <artifactId>5dv186a1</artifactId>
-            <version>1.2</version>
+            <version>1.3</version>
         </dependency>
     </dependencies>
 
