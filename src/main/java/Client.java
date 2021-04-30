@@ -101,6 +101,7 @@ public class Client {
             }
 
            // ((MyFrameAccessor)frameAccessor).closeAccessor();
+            Thread.sleep(10000);
 
             FrameAccessor.PerformanceStatistics statistics = frameAccessor.getPerformanceStatistics();
 

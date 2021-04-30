@@ -28,8 +28,8 @@ public class MyFrameAccessor implements FrameAccessor {
             performance.put(client.getHost(),new ServiceRecorder());
         }
         performanceStatistics = new ImpPerformanceStatics(performance);
-        executorService = new ThreadPoolExecutor(clients.length*10,clients.length*10, 1L,TimeUnit.SECONDS,new LinkedBlockingDeque<Runnable>());
-        //executorService = Executors.newSingleThreadExecutor();
+        // executorService = new ThreadPoolExecutor(clients.length*10,clients.length*10, 1L,TimeUnit.SECONDS,new LinkedBlockingDeque<Runnable>());
+        executorService = Executors.newSingleThreadExecutor();
         startTime = System.currentTimeMillis();
     }
     public int getFramesCount(){
@@ -41,7 +41,7 @@ public class MyFrameAccessor implements FrameAccessor {
     }
 
     public Frame getFrame(int frameID) {
-        ImpFrame frame = new ImpFrame(frameID);
+        Frame frame = new ImpFrame(frameID);
         int blockWidth = this.currentStream.getWidthInBlocks();
         int blockHeight = this.currentStream.getHeightInBlocks();
         int numOfBlocks = blockHeight*blockWidth;
@@ -95,16 +95,20 @@ public class MyFrameAccessor implements FrameAccessor {
         System.out.println("received a frame");
         return frame;
     }
+
     public void closeAccessor(){
 
-        executorService.shutdown();
-
+        executorService.shutdownNow();
+        /*
         try{
-            executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+            executorService.awaitTermination(5, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+
+         */
     }
+
 
     /*
     public static class GetBlock implements Runnable {
