@@ -66,23 +66,32 @@ public class Client {
      */
 
     public static void main(String[] args) {
-        int defaultFramesNum = 3;
+        int defaultFramesNum = 1;
 
         String host1 = "salt.cs.umu.se";
-        String host2 = "itchy.cs.umu.se";
-        String streamName = "stream8";
+        //String host2 = "itchy.cs.umu.se";
+        String streamName = "stream7";
 
         try {
 
             StreamServiceClient client1 = DefaultStreamServiceClient.bind(host1, 1000, "mrc19hzg");
             System.out.println("bind to " + host1);
-            StreamServiceClient client2 = DefaultStreamServiceClient.bind(host2, 1000, "test");
-            System.out.println("bind to " + host2);
-            StreamServiceClient[] clients = new StreamServiceClient[]{client1, client2};
+
+            // StreamServiceClient client2 = DefaultStreamServiceClient.bind(host2, 1000, "test");
+            // System.out.println("bind to " + host2);
+            StreamServiceClient[] clients = new StreamServiceClient[]{client1};
+
+
 
             printStreamInfo(client1);
 
             MyFrameAccessor.ImpFactory factory = new MyFrameAccessor.ImpFactory();
+
+            String p = factory.getClass().getCanonicalName();
+            System.out.println("The package name of ImpFactory is " + p);
+
+
+
 
             FrameAccessor frameAccessor = factory.getFrameAccessor(clients, streamName);
 
@@ -91,14 +100,16 @@ public class Client {
                 //System.out.println("get frame" + i);
             }
 
-            ((MyFrameAccessor)frameAccessor).closeAccessor();
+           // ((MyFrameAccessor)frameAccessor).closeAccessor();
+            Thread.sleep(10000);
 
             FrameAccessor.PerformanceStatistics statistics = frameAccessor.getPerformanceStatistics();
 
+
             System.out.println("The drop rate of service " + host1 + " is " + statistics.getPacketDropRate(host1));
-            System.out.println("The drop rate of service " + host2 + " is " + statistics.getPacketDropRate(host2));
+         //   System.out.println("The drop rate of service " + host2 + " is " + statistics.getPacketDropRate(host2));
             System.out.println("The packet latency of service" + host1 + " is " +  statistics.getPacketLatency(host1) + " ms");
-            System.out.println("The packet latency of service" + host2 + " is " + statistics.getPacketLatency(host2) + " ms");
+          //  System.out.println("The packet latency of service" + host2 + " is " + statistics.getPacketLatency(host2) + " ms");
 
             System.out.println("the bandwidth Utilization is " + statistics.getBandwidthUtilization() + " bps");
             System.out.println("The frame throughput is " + statistics.getFrameThroughput() + " frame per second");
