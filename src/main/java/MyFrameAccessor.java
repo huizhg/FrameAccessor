@@ -9,12 +9,12 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class MyFrameAccessor implements FrameAccessor {
+    public static volatile boolean  STOP = false;
     private StreamServiceClient[] clients;
     private StreamInfo currentStream;
     private ImpPerformanceStatics performanceStatistics;
     private HashMap<String, ServiceRecorder> performance = new HashMap<>();
     private ExecutorService executorService;
-    private volatile boolean  stopFetching = false;
     private int framesCount;
     private long startTime;
 
@@ -54,26 +54,18 @@ public class MyFrameAccessor implements FrameAccessor {
                 ServiceRecorder  serviceRecorder = this.performance.get(clients[clientIndex].getHost());
                 StreamServiceClient client = clients[clientIndex];
 
+                GetBlock task = new GetBlock(serviceRecorder, client, this.currentStream.getName(), frameID, i,j);
 
-               // List<Future<Block>> tasks = new ArrayList<>();
-                if(!stopFetching){
-                    GetBlock task = new GetBlock(serviceRecorder, client, this.currentStream.getName(), frameID, i,j);
-                    //executorService.execute(task);
-                    int blockID = i*blockWidth +j;
+                int blockID = i*blockWidth +j;
+                if(!MyFrameAccessor.STOP){
                     tasks.put(blockID,executorService.submit(task));
-
-                    //tasks.add(executorService.submit(task));
-                }else{
-                    closeAccessor();
-                    break;
+                }else {
+                    executorService.shutdown();
                 }
-
             }
-
         }
 
-        while(!tasks.isEmpty() && !(executorService.isTerminated())){
-            Set<Integer> keys = tasks.keySet();
+        while(!tasks.isEmpty() && !(executorService.isShutdown())){
             Iterator<Map.Entry<Integer,Future<Block>>> iterator = tasks.entrySet().iterator();
             while(iterator.hasNext()){
                 Map.Entry<Integer,Future<Block>> entry = iterator.next();
@@ -99,6 +91,7 @@ public class MyFrameAccessor implements FrameAccessor {
         System.out.println("received a frame");
         return frame;
     }
+
 
     public void closeAccessor(){
 
@@ -198,10 +191,12 @@ public class MyFrameAccessor implements FrameAccessor {
 
     public PerformanceStatistics getPerformanceStatistics() {
 
-        stopFetching = true;
+        executorService.shutdown();
+        MyFrameAccessor.STOP = true;
         long endTime = System.currentTimeMillis();
         long runningTime = endTime -startTime;
         performanceStatistics.update(runningTime,framesCount);
+        System.out.println(executorService.isShutdown());
         return this.performanceStatistics;
     }
 
