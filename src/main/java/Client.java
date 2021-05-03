@@ -90,9 +90,6 @@ public class Client {
             String p = factory.getClass().getCanonicalName();
             System.out.println("The package name of ImpFactory is " + p);
 
-
-
-
             FrameAccessor frameAccessor = factory.getFrameAccessor(clients, streamName);
 
             for (int i = 0; i < defaultFramesNum; i++) {
@@ -101,7 +98,7 @@ public class Client {
             }
 
            // ((MyFrameAccessor)frameAccessor).closeAccessor();
-            Thread.sleep(10000);
+            Thread.sleep(6000);
 
             FrameAccessor.PerformanceStatistics statistics = frameAccessor.getPerformanceStatistics();
 

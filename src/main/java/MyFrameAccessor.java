@@ -5,10 +5,7 @@ import se.umu.cs._5dv186.a1.client.StreamServiceClient;
 
 import java.io.IOException;
 import java.net.SocketTimeoutException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.*;
 
 public class MyFrameAccessor implements FrameAccessor {
@@ -17,6 +14,7 @@ public class MyFrameAccessor implements FrameAccessor {
     private ImpPerformanceStatics performanceStatistics;
     private HashMap<String, ServiceRecorder> performance = new HashMap<>();
     private ExecutorService executorService;
+    private volatile boolean  stopFetching = false;
     private int framesCount;
     private long startTime;
 
@@ -41,9 +39,9 @@ public class MyFrameAccessor implements FrameAccessor {
     }
 
     public Frame getFrame(int frameID) {
-        Frame frame = new ImpFrame(frameID);
         int blockWidth = this.currentStream.getWidthInBlocks();
         int blockHeight = this.currentStream.getHeightInBlocks();
+        Frame frame = new ImpFrame(frameID,blockHeight,blockWidth);
         int numOfBlocks = blockHeight*blockWidth;
         Map<Integer,Future<Block>> tasks = new HashMap<>();
         for (int i = 0; i < blockWidth; i++) {
@@ -57,40 +55,46 @@ public class MyFrameAccessor implements FrameAccessor {
                 StreamServiceClient client = clients[clientIndex];
 
 
-                //List<Future<Block>> tasks = new ArrayList<>();
-                GetBlock task = new GetBlock(serviceRecorder, client, this.currentStream.getName(), frameID, i,j);
-                //executorService.execute(task);
-                int blockID = i*blockWidth +j;
-                tasks.put(blockID,executorService.submit(task));
+               // List<Future<Block>> tasks = new ArrayList<>();
+                if(!stopFetching){
+                    GetBlock task = new GetBlock(serviceRecorder, client, this.currentStream.getName(), frameID, i,j);
+                    //executorService.execute(task);
+                    int blockID = i*blockWidth +j;
+                    tasks.put(blockID,executorService.submit(task));
 
-                //tasks.add(executorService.submit(task));
+                    //tasks.add(executorService.submit(task));
+                }else{
+                    closeAccessor();
+                    break;
+                }
 
             }
 
         }
-        /*
-        while(!tasks.isEmpty()){
-            for (int k = 0; k < numOfBlocks ; k++) {
-                if(tasks.get(k).isDone()){
-                    int blockX = k/blockWidth;
-                    int blockY = k%blockWidth;
+
+        while(!tasks.isEmpty() && !(executorService.isTerminated())){
+            Set<Integer> keys = tasks.keySet();
+            Iterator<Map.Entry<Integer,Future<Block>>> iterator = tasks.entrySet().iterator();
+            while(iterator.hasNext()){
+                Map.Entry<Integer,Future<Block>> entry = iterator.next();
+                int blockID = entry.getKey();
+                if(entry.getValue().isDone()){
+                    System.out.println("task " + blockID + " is done");
+                    int blockX = blockID/blockWidth;
+                    int blockY = blockID%blockWidth;
                     try {
-                        if(!(tasks.get(k).get()==null)){
-                            //frame.setBlock(blockX,blockY,tasks.get(k).get());
-                            System.out.printf("received block %d, block %d",blockX,blockY);
-                        }
-                        tasks.remove(k);
+                        ((ImpFrame) frame).setBlock(blockX,blockY,tasks.get(blockID).get());
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     } catch (ExecutionException e) {
                         e.printStackTrace();
                     }
+                    System.out.printf("Set block %d, block %d",blockX,blockY);
+                    iterator.remove();
+
                 }
             }
-
         }
-
-        */
         this.framesCount++;
         System.out.println("received a frame");
         return frame;
@@ -98,15 +102,13 @@ public class MyFrameAccessor implements FrameAccessor {
 
     public void closeAccessor(){
 
-        executorService.shutdownNow();
-        /*
+        executorService.shutdown();
+
         try{
             executorService.awaitTermination(5, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-
-         */
     }
 
 
@@ -145,6 +147,8 @@ public class MyFrameAccessor implements FrameAccessor {
             }
         }
     }
+
+
 
      */
 
@@ -191,9 +195,10 @@ public class MyFrameAccessor implements FrameAccessor {
 
 
 
+
     public PerformanceStatistics getPerformanceStatistics() {
 
-        this.closeAccessor();
+        stopFetching = true;
         long endTime = System.currentTimeMillis();
         long runningTime = endTime -startTime;
         performanceStatistics.update(runningTime,framesCount);
@@ -201,14 +206,17 @@ public class MyFrameAccessor implements FrameAccessor {
     }
 
     public static class ImpFrame implements Frame{
+        private int frameHeight;
+        private int frameWidth;
         private Block[][] block;
         private int frameID;
 
         public ImpFrame(){
 
         }
-        public ImpFrame(int frameID){
+        public ImpFrame(int frameID, int frameHeight, int frameWidth){
             this.frameID = frameID;
+            this.block = new Block[frameWidth][frameHeight];
         }
 
 
